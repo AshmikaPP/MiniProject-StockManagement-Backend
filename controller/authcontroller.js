@@ -35,7 +35,7 @@ export const Register=async(req,res)=>{
         password:passwordhash,
        });
        await userdata.save()
-       const otp = await sendOtpVerificationMail({email},res)
+       const otp = await sendOtpVerificationMail({email})
 
        res.status(201).json({ message: "User registered successfully" });
 
@@ -45,4 +45,49 @@ export const Register=async(req,res)=>{
         console.log(error);
     res.status(500).json({ message: "Server error" });
     }
+}
+export const verifyOtp = async(req,res)=>{
+  try {
+    const {email,otp}=req.body
+    
+    const otpRecord = await OtpSchema.findOne({email});
+
+    if(!otpRecord){
+      return res.status(400).json({message:"OTP not found"})
+    }
+    if(otpRecord.expiresAt < new Date()){
+      return res.status(400).json({message:"OTP expired"})
+    }
+    if(otpRecord.otp !==otp){
+      return res.status(400).json({message:"Invalid OTP"})
+    }
+    await userSchema.updateOne(
+      {email},
+      {$set:{is_Verified:true}}
+    )
+    await OtpSchema.deleteOne({email})
+
+    res.status(200).json({
+      success:true,
+      message:"Account verified successfully 🎉"
+    })
+
+  } catch (error) {
+    console.log("OTP VERIFY ERROR:", error);
+    res.status(500).json({ message: "OTP verification failed" });
+  }
+}
+export const ResendOtp = async(req,res)=>{
+  const {email} =req.body;
+  try {
+    await OtpSchema.deleteOne({email});
+
+    const otp = await sendOtpVerificationMail({email},res)
+    return res.status(200).json({
+      message: 'New OTP sent Successfully',
+    })
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({message:"Error resending OTP"})
+  }
 }
